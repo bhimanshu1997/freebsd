@@ -182,6 +182,8 @@ struct lun {
 	int 				l_pass_lun;
 	bool				l_is_passthrough;
 	char 				l_pass_addr[10];
+	char				l_pass_device[10];
+	char				*l_pass_periph;
 };
 
 struct target {
@@ -393,6 +395,8 @@ void			lun_set_blocksize(struct lun *lun, size_t value);
 void			lun_set_device_id(struct lun *lun, const char *value);
 void			lun_set_path(struct lun *lun, const char *value);
 void			lun_set_pass_address(struct lun *lun, const char *value);
+void                    lun_set_pass_device(struct lun *lun, const char *value);
+void                    lun_set_pass_periph(struct lun *lun, const char *value);
 void			lun_set_scsiname(struct lun *lun, const char *value);
 void			lun_set_serial(struct lun *lun, const char *value);
 void			lun_set_size(struct lun *lun, size_t value);

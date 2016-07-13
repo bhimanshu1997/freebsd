@@ -1489,7 +1489,24 @@ lun_set_pass_address(struct lun *lun, const char *value)
 	for( index = 0 ; value[index]!='\0' ; index++)
 		lun->l_pass_addr[index] = value[index];
 	lun->l_pass_addr[index] = '\0';
+}
+
+void
+lun_set_pass_device(struct lun *lun, const char *value)
+{
+	int index;
+	lun->l_pass_device[0]='\0';
+	for( index = 0 ; value[index]!='\0' ; index++)
+                lun->l_pass_device[index] = value[index];
+        lun->l_pass_device[index] = '\0';
 }	
+
+void
+lun_set_pass_periph(struct lun *lun, const char *value)
+{
+	free(lun->l_pass_periph);
+	lun->l_pass_periph = checked_strdup(value);
+}
 
 void
 lun_set_scsiname(struct lun *lun, const char *value)
@@ -1654,7 +1671,7 @@ conf_verify_lun(struct lun *lun)
 	if (lun->l_backend == NULL)
 		lun_set_backend(lun, "block");
 	if (strcmp(lun->l_backend, "block") == 0) {
-		if (lun->l_path == NULL) {
+		if (!lun->l_is_passthrough && lun->l_path == NULL) {
 			log_warnx("missing path for lun \"%s\"",
 			    lun->l_name);
 			return (1);
@@ -1682,7 +1699,7 @@ conf_verify_lun(struct lun *lun)
 		    "must be larger than 0", lun->l_name);
 		return (1);
 	}
-	if (lun->l_size != 0 && lun->l_size % lun->l_blocksize != 0) {
+	if (!lun->l_is_passthrough && (lun->l_size != 0 && lun->l_size % lun->l_blocksize != 0)) {
 		log_warnx("invalid size for lun \"%s\"; "
 		    "must be multiple of blocksize", lun->l_name);
 		return (1);
@@ -1690,6 +1707,8 @@ conf_verify_lun(struct lun *lun)
 	
 	TAILQ_FOREACH(lun2, &lun->l_conf->conf_luns, l_next) {
 		if (lun == lun2)
+			continue;
+		if (lun->l_is_passthrough || lun2->l_is_passthrough)
 			continue;
 		if (lun->l_path != NULL && lun2->l_path != NULL &&
 		    strcmp(lun->l_path, lun2->l_path) == 0) {
@@ -1975,23 +1994,34 @@ conf_apply(struct conf *oldconf, struct conf *newconf)
 			changed = 1;
 		}
 		// check for passthrough 
-		if(newlun->l_pass_addr[0]!='\0' && oldlun->l_pass_addr[0]=='\0')
+		if(newlun->l_is_passthrough && !oldlun->l_is_passthrough)
 		{
 			log_debugx("lun is changed to passthrough lun \"%s\", "
                             "CTL lun %d changed; removing",
                             oldlun->l_name, oldlun->l_ctl_lun);
                         changed = 1;
 		}
-		if(newlun->l_pass_addr[0]!='\0' && 
-			oldlun->l_pass_addr[0]!='\0' && 
-			strcmp(newlun->l_pass_addr, oldlun->l_pass_addr)!=0)
-		{
-			log_debugx("passthrough address has been"
-				" modified for lun \"%s\", "
-                           	"CTL lun %d changed; removing",
-                            	oldlun->l_name, oldlun->l_ctl_lun);
-                        changed = 1;
+		if(newlun->l_is_passthrough && 
+			oldlun->l_is_passthrough)
+		{ 
+			if (newlun->l_pass_periph==NULL && oldlun->l_pass_periph==NULL && strcmp(newlun->l_pass_addr, oldlun->l_pass_addr)!=0)
+			{
+				log_debugx("passthrough address has been"
+					" modified for lun \"%s\", "
+                           		"CTL lun %d changed; removing",
+                            		oldlun->l_name, oldlun->l_ctl_lun);
+                        	changed = 1;
+			}
+			else if (newlun->l_pass_addr[0]=='\0' && oldlun->l_pass_addr[0]=='\0' &&strcmp(newlun->l_pass_periph, oldlun->l_pass_periph)!=0)
+			{
+				 log_debugx("periph name has been"
+                                        " modified for lun \"%s\", "
+                                        "CTL lun %d changed; removing",
+                                        oldlun->l_name, oldlun->l_ctl_lun);
+	                         changed = 1;
+			}
 		}
+		
 		if (changed) {
 			error = kernel_lun_remove(oldlun);
 			if (error != 0) {

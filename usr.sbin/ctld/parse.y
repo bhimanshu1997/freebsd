@@ -962,17 +962,18 @@ lun_device_type:	DEVICE_TYPE STR
 
 lun_passthrough_device:	 PASSTHROUGH_DEVICE STR
 	{
+		char *tmp;
 		lun->l_is_passthrough = true;
-		if (lun->l_path != NULL) {
-			log_warnx("path for lun \"%s\" "
-			    "specified more than once",
-			    lun->l_name);
-		
-			free($2);
-			return (1);
-		}
-		lun_set_path(lun, $2);
-		free($2);
+		lun_set_pass_device(lun, $2);
+                free($2);
+                tmp = strtok(lun->l_pass_device,"/");
+                if(tmp!=NULL && *tmp !='\0')
+                  tmp = strtok(NULL,":");
+                  if(tmp!=NULL && *tmp != '\0')
+                    lun_set_pass_periph(lun, tmp); 
+                    
+                printf("%s",lun->l_pass_periph);
+	
 	}
 	;	
 
