@@ -1977,13 +1977,16 @@ conf_apply(struct conf *oldconf, struct conf *newconf)
 			    oldlun->l_name, oldlun->l_ctl_lun);
 			changed = 1;
 		}
-		if (newlun->l_path != NULL &&
-		    (oldlun->l_path == NULL ||
-		     strcmp(oldlun->l_path, newlun->l_path) != 0)) {
-			log_debugx("path for lun \"%s\", "
-			    "CTL lun %d, changed; removing",
-			    oldlun->l_name, oldlun->l_ctl_lun);
-			changed = 1;
+		if(!newlun->l_is_passthrough && !oldlun->l_is_passthrough)
+		{
+			if (newlun->l_path != NULL &&
+		    	(oldlun->l_path == NULL ||
+		     	strcmp(oldlun->l_path, newlun->l_path) != 0)) {
+				log_debugx("path for lun \"%s\", "
+			    	"CTL lun %d, changed; removing",
+			    	oldlun->l_name, oldlun->l_ctl_lun);
+				changed = 1;
+			}
 		}
 		if (newlun->l_serial != NULL &&
 		    (oldlun->l_serial == NULL ||
@@ -2012,7 +2015,7 @@ conf_apply(struct conf *oldconf, struct conf *newconf)
                             		oldlun->l_name, oldlun->l_ctl_lun);
                         	changed = 1;
 			}
-			else if (newlun->l_pass_addr[0]=='\0' && oldlun->l_pass_addr[0]=='\0' &&strcmp(newlun->l_pass_periph, oldlun->l_pass_periph)!=0)
+			else if (strcmp(newlun->l_pass_periph, oldlun->l_pass_periph)!=0)
 			{
 				 log_debugx("periph name has been"
                                         " modified for lun \"%s\", "
@@ -2021,7 +2024,14 @@ conf_apply(struct conf *oldconf, struct conf *newconf)
 	                         changed = 1;
 			}
 		}
-		
+		if(!newlun->l_is_passthrough && oldlun->l_is_passthrough)
+                {
+                        log_debugx("lun is changed from passthrough to lun \"%s\", "
+                            "CTL lun %d changed; removing",
+                            oldlun->l_name, oldlun->l_ctl_lun);
+                        changed = 1;
+                }
+
 		if (changed) {
 			error = kernel_lun_remove(oldlun);
 			if (error != 0) {

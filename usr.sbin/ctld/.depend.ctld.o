@@ -1,0 +1,45 @@
+ctld.o: ctld.c \
+  /usr/home/bhimanshu/freebsd/usr.sbin/ctld/../../sys/sys/cdefs.h \
+  /usr/home/bhimanshu/freebsd/usr.sbin/ctld/../../sys/sys/types.h \
+  /usr/include/machine/endian.h /usr/include/x86/endian.h \
+  /usr/home/bhimanshu/freebsd/usr.sbin/ctld/../../sys/sys/_types.h \
+  /usr/include/machine/_types.h /usr/include/x86/_types.h \
+  /usr/home/bhimanshu/freebsd/usr.sbin/ctld/../../sys/sys/_pthreadtypes.h \
+  /usr/home/bhimanshu/freebsd/usr.sbin/ctld/../../sys/sys/_stdint.h \
+  /usr/home/bhimanshu/freebsd/usr.sbin/ctld/../../sys/sys/select.h \
+  /usr/home/bhimanshu/freebsd/usr.sbin/ctld/../../sys/sys/_sigset.h \
+  /usr/home/bhimanshu/freebsd/usr.sbin/ctld/../../sys/sys/_timeval.h \
+  /usr/home/bhimanshu/freebsd/usr.sbin/ctld/../../sys/sys/timespec.h \
+  /usr/home/bhimanshu/freebsd/usr.sbin/ctld/../../sys/sys/_timespec.h \
+  /usr/home/bhimanshu/freebsd/usr.sbin/ctld/../../sys/sys/time.h \
+  /usr/include/time.h \
+  /usr/home/bhimanshu/freebsd/usr.sbin/ctld/../../sys/sys/_null.h \
+  /usr/include/xlocale/_time.h \
+  /usr/home/bhimanshu/freebsd/usr.sbin/ctld/../../sys/sys/socket.h \
+  /usr/home/bhimanshu/freebsd/usr.sbin/ctld/../../sys/sys/_iovec.h \
+  /usr/include/machine/_align.h /usr/include/x86/_align.h \
+  /usr/home/bhimanshu/freebsd/usr.sbin/ctld/../../sys/sys/_sockaddr_storage.h \
+  /usr/home/bhimanshu/freebsd/usr.sbin/ctld/../../sys/sys/stat.h \
+  /usr/home/bhimanshu/freebsd/usr.sbin/ctld/../../sys/sys/wait.h \
+  /usr/home/bhimanshu/freebsd/usr.sbin/ctld/../../sys/netinet/in.h \
+  /usr/home/bhimanshu/freebsd/usr.sbin/ctld/../../sys/netinet6/in6.h \
+  /usr/include/arpa/inet.h /usr/include/assert.h /usr/include/ctype.h \
+  /usr/include/_ctype.h /usr/include/runetype.h \
+  /usr/include/xlocale/_ctype.h /usr/include/errno.h \
+  /usr/include/netdb.h /usr/include/signal.h \
+  /usr/home/bhimanshu/freebsd/usr.sbin/ctld/../../sys/sys/signal.h \
+  /usr/include/machine/_limits.h /usr/include/x86/_limits.h \
+  /usr/include/machine/signal.h /usr/include/x86/signal.h \
+  /usr/include/machine/trap.h /usr/include/x86/trap.h \
+  /usr/include/machine/ucontext.h /usr/include/x86/ucontext.h \
+  /usr/home/bhimanshu/freebsd/usr.sbin/ctld/../../sys/sys/_ucontext.h \
+  /usr/include/stdbool.h /usr/include/stdio.h /usr/include/stdint.h \
+  /usr/include/machine/_stdint.h /usr/include/x86/_stdint.h \
+  /usr/include/stdlib.h /usr/include/string.h /usr/include/strings.h \
+  /usr/include/xlocale/_strings.h /usr/include/xlocale/_string.h \
+  /usr/include/unistd.h \
+  /usr/home/bhimanshu/freebsd/usr.sbin/ctld/../../sys/sys/unistd.h \
+  /usr/home/bhimanshu/freebsd/usr.sbin/ctld/ctld.h \
+  /usr/home/bhimanshu/freebsd/usr.sbin/ctld/../../sys/sys/queue.h \
+  /usr/include/libutil.h \
+  /usr/home/bhimanshu/freebsd/usr.sbin/ctld/isns.h

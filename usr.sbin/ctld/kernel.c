@@ -114,6 +114,10 @@ struct cctl_lun {
 	char *serial_number;
 	char *device_id;
 	char *ctld_name;
+	int scbus;
+	int target;
+	int lun;
+	char *pass_periph;
 	STAILQ_HEAD(,cctl_lun_nv) attr_list;
 	STAILQ_ENTRY(cctl_lun) links;
 };
@@ -623,6 +627,10 @@ retry_port:
 		lun_set_serial(cl, lun->serial_number);
 		lun_set_size(cl, lun->size_blocks * cl->l_blocksize);
 		lun_set_ctl_lun(cl, lun->lun_id);
+		lun_set_pass_periph(cl, lun->pass_periph);
+		cl->l_pass_bus = lun->scbus;
+		cl->l_pass_target = lun->scbus;
+		cl->l_pass_lun = lun->lun;
 
 		STAILQ_FOREACH(nv, &lun->attr_list, links) {
 			if (strcmp(nv->name, "file") == 0 ||
@@ -668,13 +676,18 @@ kernel_lun_add(struct lun *lun)
 	req.reqdata.create.blocksize_bytes = lun->l_blocksize;
 
 
-//	if(lun->l_pass_addr[0] != '\0')
-//	{
-//		req.reqdata.create.scbus = lun->l_pass_bus;
-//		req.reqdata.create.target = lun->l_pass_target;
-//		req.reqdata.create.lun_num = lun->l_pass_lun;
-//	}
-	if (lun->l_size != 0)
+	if(lun->l_is_passthrough && lun->l_pass_periph == NULL)
+	{
+		req.reqdata.create.scbus = lun->l_pass_bus;
+		req.reqdata.create.target = lun->l_pass_target;
+		req.reqdata.create.lun_num = lun->l_pass_lun;
+	}
+	if(lun->l_is_passthrough && lun->l_pass_periph != NULL)
+	{
+		strncpy(req.reqdata.create.pass_periph, lun->l_pass_periph,
+                        sizeof(req.reqdata.create.pass_periph));
+	}
+	if (!lun->l_is_passthrough && lun->l_size != 0)
 		req.reqdata.create.lun_size_bytes = lun->l_size;
 
 	if (lun->l_ctl_lun >= 0) {
@@ -684,7 +697,7 @@ kernel_lun_add(struct lun *lun)
 
 	req.reqdata.create.flags |= CTL_LUN_FLAG_DEV_TYPE;
 	req.reqdata.create.device_type = lun->l_device_type;
-
+	
 	if (lun->l_serial != NULL) {
 		strncpy(req.reqdata.create.serial_num, lun->l_serial,
 			sizeof(req.reqdata.create.serial_num));
@@ -697,7 +710,7 @@ kernel_lun_add(struct lun *lun)
 		req.reqdata.create.flags |= CTL_LUN_FLAG_DEVID;
 	}
 
-	if (lun->l_path != NULL) {
+	if (!lun->l_is_passthrough && lun->l_path != NULL) {
 		o = option_find(&lun->l_options, "file");
 		if (o != NULL) {
 			option_set(o, lun->l_path);
@@ -782,7 +795,8 @@ kernel_lun_modify(struct lun *lun)
 	req.reqtype = CTL_LUNREQ_MODIFY;
 
 	req.reqdata.modify.lun_id = lun->l_ctl_lun;
-	req.reqdata.modify.lun_size_bytes = lun->l_size;
+	if(!lun->l_is_passthrough)
+		req.reqdata.modify.lun_size_bytes = lun->l_size;
 
 	num_options = 0;
 	TAILQ_FOREACH(o, &lun->l_options, o_next)

@@ -1,0 +1,1 @@
+ctld.full: /usr/lib/libc.a /usr/lib/libbsdxml.a /usr/lib/libl.a /usr/lib/libmd.a /usr/lib/libsbuf.a /usr/lib/libutil.a /usr/lib/libprivateucl.a /usr/lib/libm.a

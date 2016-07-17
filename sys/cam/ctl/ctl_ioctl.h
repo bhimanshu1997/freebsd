@@ -403,6 +403,7 @@ struct ctl_lun_create_params {
         uint8_t			scbus;
 	uint8_t			target;
 	uint8_t			lun_num;
+	char 			pass_periph[5];
 };
 
 /*
