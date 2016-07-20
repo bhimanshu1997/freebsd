@@ -3225,6 +3225,10 @@ struct cctl_lun {
 	uint64_t size_blocks;
 	uint32_t blocksize;
 	char *serial_number;
+	int scbus;
+	int target;
+	int lun;
+	char *pass_periph;	
 	char *device_id;
 	STAILQ_HEAD(,cctl_lun_nv) attr_list;
 	STAILQ_ENTRY(cctl_lun) links;
@@ -3332,6 +3336,15 @@ cctl_end_element(void *user_data, const char *name)
 		str = NULL;
 	} else if (strcmp(name, "lun") == 0) {
 		devlist->cur_lun = NULL;
+	} else if (strcmp(name, "scbus") == 0) {
+		cur_lun->scbus = strtol(str,NULL,0);
+	} else if (strcmp(name, "target") == 0) {
+                cur_lun->target = strtol(str,NULL,0);
+	} else if (strcmp(name, "lun") == 0) {
+                cur_lun->lun = strtol(str,NULL,0);
+	} else if (strcmp(name, "pass_periph") == 0) {
+                cur_lun->pass_periph = str;
+		str=NULL;
 	} else if (strcmp(name, "ctllunlist") == 0) {
 		/* Nothing. */
 	} else {
