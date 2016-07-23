@@ -85,7 +85,6 @@ struct conf *
 conf_new(void)
 {
 	struct conf *conf;
-
 	conf = calloc(1, sizeof(*conf));
 	if (conf == NULL)
 		log_err(1, "calloc");
@@ -102,7 +101,6 @@ conf_new(void)
 	conf->conf_debug = 0;
 	conf->conf_timeout = 60;
 	conf->conf_maxproc = 30;
-
 	return (conf);
 }
 
@@ -2063,6 +2061,7 @@ conf_apply(struct conf *oldconf, struct conf *newconf)
 		}
 		log_debugx("adding lun \"%s\"", newlun->l_name);
 		error = kernel_lun_add(newlun);
+		log_warnx("add lun %d",(int)error);
 		if (error != 0) {
 			log_warnx("failed to add lun \"%s\"", newlun->l_name);
 			lun_delete(newlun);

@@ -13,7 +13,7 @@ CFLAGS+=	-I${.CURDIR}/../../sys/dev/iscsi
 #CFLAGS+=	-DICL_KERNEL_PROXY
 MAN=		ctld.8 ctl.conf.5
 
-LIBADD=		bsdxml l md sbuf util ucl m
+LIBADD=		bsdxml l md sbuf util ucl m xo
 
 YFLAGS+=	-v
 CLEANFILES=	y.tab.c y.tab.h y.output

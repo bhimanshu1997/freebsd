@@ -56,6 +56,18 @@ __FBSDID("$FreeBSD$");
 #include <stdlib.h>
 #include <string.h>
 #include <strings.h>
+
+#include <unistd.h>
+#include <cam/cam.h>
+#include <cam/cam_debug.h>
+#include <cam/cam_ccb.h>
+#include <cam/scsi/scsi_pass.h>
+#include <cam/scsi/smp_all.h>
+#include <cam/ata/ata_all.h>
+#include <camlib.h>
+#include <libxo/xo.h>
+
+
 #include <cam/scsi/scsi_all.h>
 #include <cam/scsi/scsi_message.h>
 #include <cam/ctl/ctl.h>
@@ -627,11 +639,10 @@ retry_port:
 		lun_set_serial(cl, lun->serial_number);
 		lun_set_size(cl, lun->size_blocks * cl->l_blocksize);
 		lun_set_ctl_lun(cl, lun->lun_id);
-		lun_set_pass_periph(cl, lun->pass_periph);
+		//lun_set_pass_periph(cl, lun->pass_periph);
 		cl->l_pass_bus = lun->scbus;
 		cl->l_pass_target = lun->scbus;
 		cl->l_pass_lun = lun->lun;
-
 		STAILQ_FOREACH(nv, &lun->attr_list, links) {
 			if (strcmp(nv->name, "file") == 0 ||
 			    strcmp(nv->name, "dev") == 0) {
@@ -666,8 +677,10 @@ kernel_lun_add(struct lun *lun)
 {
 	struct option *o;
 	struct ctl_lun_req req;
-	int error, i, num_options;
-
+	int error, num_options;
+	unsigned int i;
+	char peripheral[5];
+	struct periph_match_result *periph_result;
 	bzero(&req, sizeof(req));
 
 	strlcpy(req.backend, lun->l_backend, sizeof(req.backend));
@@ -675,18 +688,75 @@ kernel_lun_add(struct lun *lun)
 
 	req.reqdata.create.blocksize_bytes = lun->l_blocksize;
 
-
 	if(lun->l_is_passthrough && lun->l_pass_periph == NULL)
 	{
 		req.reqdata.create.scbus = lun->l_pass_bus;
 		req.reqdata.create.target = lun->l_pass_target;
 		req.reqdata.create.lun_num = lun->l_pass_lun;
 	}
+	log_warnx("if in");
 	if(lun->l_is_passthrough && lun->l_pass_periph != NULL)
 	{
-		strncpy(req.reqdata.create.pass_periph, lun->l_pass_periph,
-                        sizeof(req.reqdata.create.pass_periph));
+
+		union ccb ccb;
+	        int bufsize, fd;
+       	 	//unsigned int i;
+        	if ((fd = open(XPT_DEVICE, O_RDWR)) == -1) {
+                	log_warnx("couldn't open %s", XPT_DEVICE);
+                	return(1);
+        	}
+	        bzero(&ccb, sizeof(union ccb));
+
+        	ccb.ccb_h.path_id = CAM_XPT_PATH_ID;
+	        ccb.ccb_h.target_id = CAM_TARGET_WILDCARD;
+	        ccb.ccb_h.target_lun = CAM_LUN_WILDCARD;
+	      	ccb.ccb_h.func_code = XPT_DEV_MATCH;
+	        bufsize = sizeof(struct dev_match_result) * 100;
+        	ccb.cdm.match_buf_len = bufsize;
+	        ccb.cdm.matches = (struct dev_match_result *)malloc(bufsize);
+	        if (ccb.cdm.matches == NULL) {
+        	        log_warnx("can't malloc memory for matches");
+                	close(fd);
+                	return(1);
+       		}	
+        	ccb.cdm.num_matches = 0;
+		ccb.cdm.num_patterns = 0;
+	        ccb.cdm.pattern_buf_len = 0;
+		log_warnx("before do");
+        	do {
+			if (ioctl(fd, CAMIOCOMMAND, &ccb) == -1) {
+                        	log_warn("error sending CAMIOCOMMAND ioctl");
+	                        break;
+        	        }
+
+	               	if ((ccb.ccb_h.status != CAM_REQ_CMP)
+        	         || ((ccb.cdm.status != CAM_DEV_MATCH_LAST)
+                	    && (ccb.cdm.status != CAM_DEV_MATCH_MORE))) {
+                       		log_warnx("got CAM error %#x, CDM error %d\n",
+                              		ccb.ccb_h.status, ccb.cdm.status);
+               		        break;
+                	}
+
+	                for (i = 0; i < ccb.cdm.num_matches; i++) {
+  	                        periph_result = &ccb.cdm.matches[i].result.periph_result;
+				if (strcmp(periph_result->periph_name, "pass") == 0)
+                               	        continue;
+				log_warnx("in for");
+				sprintf(peripheral,"%s%d",periph_result->periph_name,(int)periph_result->unit_number);
+				if(strcmp(peripheral, lun->l_pass_periph) == 0) {
+					req.reqdata.create.scbus = periph_result->path_id;
+			                req.reqdata.create.target = periph_result->target_id;
+			                req.reqdata.create.lun_num = periph_result->target_lun;
+					log_warnx("pass created: %d %d %d",req.reqdata.create.scbus,req.reqdata.create.target,req.reqdata.create.lun_num);		
+				}
+	      	        }
+        	     } while ((ccb.ccb_h.status == CAM_REQ_CMP)
+                			&& (ccb.cdm.status == CAM_DEV_MATCH_MORE));
+			 
+	  close(fd);
+	
 	}
+	log_warnx("if out");
 	if (!lun->l_is_passthrough && lun->l_size != 0)
 		req.reqdata.create.lun_size_bytes = lun->l_size;
 
@@ -752,7 +822,7 @@ kernel_lun_add(struct lun *lun)
 			str_arg(&req.be_args[i], o->o_name, o->o_value);
 			i++;
 		}
-		assert(i == num_options);
+		assert((int)i == num_options);
 	}
 	
 	error = ioctl(ctl_fd, CTL_LUN_REQ, &req);
