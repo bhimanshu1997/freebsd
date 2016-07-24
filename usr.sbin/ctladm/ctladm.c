@@ -2287,7 +2287,6 @@ cctl_create_lun(int fd, int argc, char **argv, char *combinedopt)
 	uint64_t lun_size = 0;
 	uint32_t blocksize = 0, req_lun_id = 0;
 	int scbus=0, target=0, lun=0;
-	char *pass_periph = NULL;
 	char *serial_num = NULL;
 	char *device_id = NULL;
 	int lun_size_set = 0, blocksize_set = 0, lun_id_set = 0;
@@ -2300,18 +2299,6 @@ cctl_create_lun(int fd, int argc, char **argv, char *combinedopt)
 
 	while ((c = getopt(argc, argv, combinedopt)) != -1) {
 		switch (c) {
-		case 'T':
-			target = strtoul(optarg, NULL, 0);
-			break;
-		case 'P':
-			pass_periph = strdup(optarg);
-			break;
-		case 'L':
-			lun = strtoul(optarg, NULL, 0);
-			break;
-		case 'U':
-			scbus = strtoul(optarg, NULL, 0);
-			break;
 		case 'b':
 			backend_name = strdup(optarg);
 			break;
@@ -2427,17 +2414,6 @@ cctl_create_lun(int fd, int argc, char **argv, char *combinedopt)
 		req.reqdata.create.flags |= CTL_LUN_FLAG_DEVID;
 	}
 
-	if (pass_periph == NULL)
-	{
-		req.reqdata.create.scbus = scbus;
-        	req.reqdata.create.target = target;
-        	req.reqdata.create.lun_num = lun;
-	}else {
-                strncpy(req.reqdata.create.pass_periph, pass_periph,
-                        sizeof(req.reqdata.create.pass_periph));
-        }
-
-
 	req.num_be_args = num_options;
 	if (num_options > 0) {
 		struct cctl_req_option *option, *next_option;
@@ -2459,6 +2435,28 @@ cctl_create_lun(int fd, int argc, char **argv, char *combinedopt)
 			req.be_args[i].name = strdup(option->name);
 			req.be_args[i].vallen = option->vallen;
 			req.be_args[i].value = strdup(option->value);
+			if(strcmp(req.be_args[i].name , "passthrough")==0) {
+				char *tmp,*addr=NULL;
+				addr=(char *)malloc(strlen(req.be_args[i].value));
+				strcpy(addr,req.be_args[i].value);
+		                tmp = strtok(addr,":");
+                		if(tmp!=NULL && *tmp !='\0') {
+		                  scbus = strtol(tmp,NULL,0);
+		                  tmp = strtok(NULL,":");
+                		  if(tmp!=NULL && *tmp != '\0') {
+		                    target = strtol(tmp,NULL,0);
+                		    tmp = strtok(NULL,":");
+		                    if(tmp!=NULL && *tmp != '\0') 
+		                      lun = strtol(tmp,NULL,0);
+				  }
+				}
+                		warn("%d   %d   %d",scbus, target,lun);
+		
+				req.reqdata.create.scbus = scbus;
+		                req.reqdata.create.target = target;
+               			req.reqdata.create.lun_num = lun;
+				free(addr);
+			}
 			/*
 			 * XXX KDM do we want a way to specify a writeable
 			 * flag of some sort?  Do we want a way to specify

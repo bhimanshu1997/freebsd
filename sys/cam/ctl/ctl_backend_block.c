@@ -2124,6 +2124,7 @@ ctl_be_block_open(struct ctl_be_block_lun *be_lun, struct ctl_lun_req *req)
 	struct ctl_be_lun *cbe_lun = &be_lun->cbe_lun;
 	struct nameidata nd;
 	char		*value;
+	char 		*pass_value;
 	int		 error, flags;
 
 	error = 0;
@@ -2135,9 +2136,10 @@ ctl_be_block_open(struct ctl_be_block_lun *be_lun, struct ctl_lun_req *req)
 	pwd_ensure_dirs();
 
 	value = ctl_get_opt(&cbe_lun->options, "file");
-	if (value == NULL) {
+	pass_vlaue = ctl_get_opt(&cbe_lun->options, "passthrough");
+	if (value == NULL && pass_value == NULL) {
 		snprintf(req->error_str, sizeof(req->error_str),
-			 "no file argument specified");
+			 "no file or passthrough argument specified");
 		return (1);
 	}
 	free(be_lun->dev_path, M_CTLBLK);
@@ -2250,7 +2252,7 @@ ctl_be_block_create(struct ctl_be_block_softc *softc, struct ctl_lun_req *req)
 			 "error allocating UMA zone");
 		goto bailout_error;
 	}
-
+	
 	if (params->flags & CTL_LUN_FLAG_DEV_TYPE)
 		cbe_lun->lun_type = params->device_type;
 	else
@@ -2289,7 +2291,9 @@ ctl_be_block_create(struct ctl_be_block_softc *softc, struct ctl_lun_req *req)
 	} else {
 		num_threads = 1;
 	}
-
+	cbe_lun->scbus = params->scbus;
+	cbe_lun->target = params->target;
+	cbe_lun->lun = params->lun_num;	
 	value = ctl_get_opt(&cbe_lun->options, "num_threads");
 	if (value != NULL) {
 		tmp_num_threads = strtol(value, NULL, 0);
