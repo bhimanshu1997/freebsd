@@ -2435,6 +2435,7 @@ cctl_create_lun(int fd, int argc, char **argv, char *combinedopt)
 			req.be_args[i].name = strdup(option->name);
 			req.be_args[i].vallen = option->vallen;
 			req.be_args[i].value = strdup(option->value);
+			//warn("%s",req.be_args[i].value);
 			if(strcmp(req.be_args[i].name , "passthrough")==0) {
 				char *tmp,*addr=NULL;
 				addr=(char *)malloc(strlen(req.be_args[i].value));

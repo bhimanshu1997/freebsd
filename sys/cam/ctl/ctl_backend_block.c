@@ -2136,7 +2136,7 @@ ctl_be_block_open(struct ctl_be_block_lun *be_lun, struct ctl_lun_req *req)
 	pwd_ensure_dirs();
 
 	value = ctl_get_opt(&cbe_lun->options, "file");
-	pass_vlaue = ctl_get_opt(&cbe_lun->options, "passthrough");
+	pass_value = ctl_get_opt(&cbe_lun->options, "passthrough");
 	if (value == NULL && pass_value == NULL) {
 		snprintf(req->error_str, sizeof(req->error_str),
 			 "no file or passthrough argument specified");

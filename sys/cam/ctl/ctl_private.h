@@ -401,7 +401,7 @@ struct ctl_lun {
 	
 	int 				scbus;
 	int 				target;
-	int 				lun;
+	int 				lun_num;
 
 	TAILQ_HEAD(tpc_lists, tpc_list) tpc_lists;
 };

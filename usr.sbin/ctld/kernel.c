@@ -788,8 +788,16 @@ kernel_lun_add(struct lun *lun)
 			o = option_new(&lun->l_options, "file", lun->l_path);
 			assert(o != NULL);
 		}
+	}else {
+		o = option_find(&lun->l_options, "passthrough");
+		if(o != NULL) {
+			option_set(o, lun->l_pass_addr);
+		} else {
+			o = option_new(&lun->l_options, "passthrough", lun->l_pass_addr);
+			assert(o != NULL);
+		}
 	}
-
+	
 	o = option_find(&lun->l_options, "ctld_name");
 	if (o != NULL) {
 		option_set(o, lun->l_name);
