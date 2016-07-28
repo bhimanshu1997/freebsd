@@ -2286,6 +2286,8 @@ cctl_create_lun(int fd, int argc, char **argv, char *combinedopt)
 	int device_type = -1;
 	uint64_t lun_size = 0;
 	uint32_t blocksize = 0, req_lun_id = 0;
+	int scbus=0, target=0, lun=0;
+	char *pass_periph = NULL;
 	char *serial_num = NULL;
 	char *device_id = NULL;
 	int lun_size_set = 0, blocksize_set = 0, lun_id_set = 0;
@@ -2298,6 +2300,18 @@ cctl_create_lun(int fd, int argc, char **argv, char *combinedopt)
 
 	while ((c = getopt(argc, argv, combinedopt)) != -1) {
 		switch (c) {
+		case 'T':
+			target = strtoul(optarg, NULL, 0);
+			break;
+		case 'P':
+			pass_periph = strdup(optarg);
+			break;
+		case 'L':
+			lun = strtoul(optarg, NULL, 0);
+			break;
+		case 'U':
+			scbus = strtoul(optarg, NULL, 0);
+			break;
 		case 'b':
 			backend_name = strdup(optarg);
 			break;
@@ -2412,6 +2426,17 @@ cctl_create_lun(int fd, int argc, char **argv, char *combinedopt)
 			sizeof(req.reqdata.create.device_id));
 		req.reqdata.create.flags |= CTL_LUN_FLAG_DEVID;
 	}
+
+	if (pass_periph == NULL)
+	{
+		req.reqdata.create.scbus = scbus;
+        	req.reqdata.create.target = target;
+        	req.reqdata.create.lun_num = lun;
+	}else {
+                strncpy(req.reqdata.create.pass_periph, pass_periph,
+                        sizeof(req.reqdata.create.pass_periph));
+        }
+
 
 	req.num_be_args = num_options;
 	if (num_options > 0) {
