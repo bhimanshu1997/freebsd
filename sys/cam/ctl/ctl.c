@@ -3107,8 +3107,8 @@ ctl_ioctl(struct cdev *dev, u_long cmd, caddr_t addr, int flag,
                                              lun->be_lun->target);
 			retval = sbuf_printf(sb, "\t<lun_num>%u</lun_num>\n",
                                              lun->be_lun->lun);
-			retval = sbuf_printf(sb, "\t<pass_periph>%s</pass_periph>\n",
-                                             lun->be_lun->pass_periph);
+		//	retval = sbuf_printf(sb, "\t<pass_periph>%s</pass_periph>\n",
+                  //                           lun->be_lun->pass_periph);
 
 
 			retval = sbuf_printf(sb, "\t<device_id>");
