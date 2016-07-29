@@ -96,6 +96,7 @@ cam/scsi/scsi_ch.c		optional ch
 cam/ata/ata_da.c		optional ada | da
 cam/ctl/ctl.c			optional ctl
 cam/ctl/ctl_backend.c		optional ctl
+cam/ctl/ctl_backend_passthrough.c  optional ctl
 cam/ctl/ctl_backend_block.c	optional ctl
 cam/ctl/ctl_backend_ramdisk.c	optional ctl
 cam/ctl/ctl_cmd_table.c		optional ctl
@@ -122,6 +123,7 @@ cam/scsi/scsi_sg.c		optional sg
 cam/scsi/scsi_targ_bh.c		optional targbh
 cam/scsi/scsi_target.c		optional targ
 cam/scsi/smp_all.c		optional scbus
+cam/scsi/scsi_passthrough.c     optional passthrough
 # shared between zfs and dtrace
 cddl/compat/opensolaris/kern/opensolaris.c		optional zfs | dtrace compile-with "${CDDL_C}"
 cddl/compat/opensolaris/kern/opensolaris_cmn_err.c	optional zfs | dtrace compile-with "${CDDL_C}"

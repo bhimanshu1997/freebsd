@@ -137,7 +137,7 @@ device		adw			# Advansys wide SCSI adapters
 device		aic			# Adaptec 15[012]x SCSI adapters, AIC-6[23]60.
 device		bt			# Buslogic/Mylex MultiMaster SCSI adapters
 device		isci			# Intel C600 SAS controller
-
+device		iscsi
 # ATA/SCSI peripherals
 device		scbus			# SCSI bus (required for ATA/SCSI)
 device		ch			# SCSI media changers
@@ -146,7 +146,7 @@ device		sa			# Sequential Access (tape etc)
 device		cd			# CD
 device		pass			# Passthrough device (direct ATA/SCSI access)
 device		ses			# Enclosure Services (SES and SAF-TE)
-#device		ctl			# CAM Target Layer
+device		ctl			# CAM Target Layer
 
 # RAID controllers interfaced to the SCSI subsystem
 device		amr			# AMI MegaRAID

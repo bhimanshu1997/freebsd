@@ -1706,8 +1706,8 @@ conf_verify_lun(struct lun *lun)
 	TAILQ_FOREACH(lun2, &lun->l_conf->conf_luns, l_next) {
 		if (lun == lun2)
 			continue;
-		if (lun->l_is_passthrough || lun2->l_is_passthrough)
-			continue;
+	//	if (lun->l_is_passthrough || lun2->l_is_passthrough)
+	//		continue;
 		if (lun->l_path != NULL && lun2->l_path != NULL &&
 		    strcmp(lun->l_path, lun2->l_path) == 0) {
 			log_debugx("WARNING: path \"%s\" duplicated "
@@ -2029,6 +2029,10 @@ conf_apply(struct conf *oldconf, struct conf *newconf)
                             oldlun->l_name, oldlun->l_ctl_lun);
                         changed = 1;
                 }
+
+		log_debugx("changed %d",changed);
+                if(oldlun->l_is_passthrough)
+                        log_debugx("changed  passthrough");
 
 		if (changed) {
 			error = kernel_lun_remove(oldlun);

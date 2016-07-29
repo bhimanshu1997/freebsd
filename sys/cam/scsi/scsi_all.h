@@ -2088,6 +2088,7 @@ struct ata_pass_32 {
 #define	T_OCRW		0x0f
 #define	T_OSD		0x11
 #define	T_ADC		0x12
+#define T_PASSTHROUGH   0x13
 #define	T_ZBC_HM	0x14
 #define	T_NODEVICE	0x1f
 #define	T_ANY		0xff	/* Used in Quirk table matches */

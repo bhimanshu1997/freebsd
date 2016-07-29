@@ -963,10 +963,12 @@ lun_device_type:	DEVICE_TYPE STR
 lun_passthrough_device:	 PASSTHROUGH_DEVICE STR
 	{
 		char *tmp;
+		char tmp_dev[10];
 		lun->l_is_passthrough = true;
 		lun_set_pass_device(lun, $2);
                 free($2);
-                tmp = strtok(lun->l_pass_device,"/");
+		strcpy(tmp_dev,lun->l_pass_device);
+                tmp = strtok(tmp_dev,"/");
                 if(tmp!=NULL && *tmp !='\0')
                   tmp = strtok(NULL,":");
                   if(tmp!=NULL && *tmp != '\0')
@@ -980,10 +982,12 @@ lun_passthrough_device:	 PASSTHROUGH_DEVICE STR
 lun_passthrough_address:  PASSTHROUGH_ADDRESS STR
 	{
 		char *tmp;
+		char tmp_addr[10];
 		lun_set_pass_address(lun, $2);
 		free($2);
 		lun->l_is_passthrough = true;	
-		tmp = strtok(lun->l_pass_addr,":");
+		strcpy(tmp_addr,lun->l_pass_addr);
+		tmp = strtok(tmp_addr,":");
 		if(tmp!=NULL && *tmp !='\0')
 		  lun->l_pass_bus = strtol(tmp,NULL,0);
 		  tmp = strtok(NULL,":");
