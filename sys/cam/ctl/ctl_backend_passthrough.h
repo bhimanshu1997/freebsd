@@ -16,6 +16,7 @@
 #include <sys/module.h>
 #include <sys/sysctl.h>
 
+#include <cam/cam.h>
 
 #include <cam/scsi/scsi_all.h>
 #include <cam/scsi/scsi_da.h>
@@ -61,5 +62,5 @@ struct ctl_be_passthrough_softc {
 };
 
 
-int ctl_backend_passthrough_create(struct cam_periph *periph, struct ctl_lun_req *req);
+int ctl_backend_passthrough_create(struct cam_periph *periph,struct scsi_inquiry_data *inq_data,struct ctl_lun_req *lun_req);
 #endif
