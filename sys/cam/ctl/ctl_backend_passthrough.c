@@ -114,14 +114,10 @@ static int ctl_backend_passthrough_ioctl(struct cdev *dev, u_long cmd, caddr_t a
 		u_int path_id;
 		u_int target_id;
 		u_int32_t lun_id;
-		struct cam_path *path=NULL;
+		struct cam_path *path = NULL;
 		struct cam_periph *periph=NULL;
-		struct cam_ed *device = NULL;
-		struct cam_eb *bus = NULL;
-		struct cam_et *target = NULL;
 		struct ctl_lun_create_params *params = NULL;
-		struct scsi_inquiry_data *inq_data = NULL;
-		
+		char *name ="ctlpass";	
 		params = &lun_req->reqdata.create;
 		path_id = params->scbus;
 		target_id = params->target;
@@ -129,19 +125,16 @@ static int ctl_backend_passthrough_ioctl(struct cdev *dev, u_long cmd, caddr_t a
 		
 		printf("path id %d and target id %d",path_id,target_id);
 
-		if(xpt_create_path(&path ,NULL ,path_id,target_id ,lun_id) == CAM_REQ_CMP)
+		if(xpt_create_path(&path, NULL, path_id, target_id, lun_id) == CAM_REQ_CMP)
 		{
+			if(path == NULL)
+				printf("path is NULL");
+			xpt_print_path(path);
 			xpt_path_lock(path);
-		periph = cam_periph_find(path,"ctlpass");
-			xpt_path_unlock(path);
-			xpt_free_path(path);	
-		bus = xpt_find_bus(path_id);
-			xpt_lock_buses();
-		target = xpt_find_target(bus,target_id);
-		xpt_unlock_buses();
-		device =xpt_alloc_device(bus,target,lun_id);
-		inq_data = get_inq_data(device);	
-		retval = ctl_backend_passthrough_create(periph, inq_data,lun_req);
+		periph = cam_periph_find(path,name);
+		xpt_path_unlock(path);
+		xpt_free_path(path);	
+		retval = ctl_backend_passthrough_create(periph,lun_req);
 		}
 		lun_req->status = CTL_LUN_OK;	
 			break;
@@ -166,16 +159,15 @@ static int ctl_backend_passthrough_ioctl(struct cdev *dev, u_long cmd, caddr_t a
 
 	return (retval);
 }
-int ctl_backend_passthrough_create(struct cam_periph *periph,struct scsi_inquiry_data *inq_data,struct ctl_lun_req *lun_req)
+int ctl_backend_passthrough_create(struct cam_periph *periph,struct ctl_lun_req *lun_req)
 {
 	struct ctl_lun_create_params *params;
 	struct ctl_be_passthrough_softc *softc = &rd_softc;
 	struct ctl_be_passthrough_lun *be_lun;
-//	struct ctl_be_lun *ctl_be_lun;
-	struct ctl_be_lun *cbe_lun=NULL;
+	struct ctl_be_lun *cbe_lun;
 	char *value;
-	char num_thread_str[16];
-	int num_threads=0 , tmp_num_threads=0;
+        char num_thread_str[16];
+        int num_threads=0 , tmp_num_threads=0;
 	char tmpstr[32];
 	
 	int retval;
@@ -190,25 +182,32 @@ int ctl_backend_passthrough_create(struct cam_periph *periph,struct scsi_inquiry
 			goto created;
 	}*/
 
-
 	be_lun = malloc(sizeof(*be_lun), M_PASSTHROUGH, M_ZERO | M_WAITOK);
 
 	if(be_lun == NULL)
 	{
 		goto bailout_error;
 	}
-	cbe_lun = &be_lun->cbe_lun;
-        cbe_lun->be_lun = be_lun;
-//	STAILQ_INIT(&be_lun->cbe_lun.options);
-	cbe_lun->lun_type = params->device_type;
-	be_lun->cbe_lun.lun_type = params->device_type;
+	STAILQ_INIT(&be_lun->cbe_lun.options);
 
+	cbe_lun = &be_lun->cbe_lun;
+	cbe_lun->be_lun = be_lun;
+
+        cbe_lun->lun_type = T_PASSTHROUGH;
+	
+	be_lun->params = lun_req->reqdata.create;
+	be_lun->cbe_lun.lun_type = T_PASSTHROUGH;
+	be_lun->softc=softc;
+	be_lun->periph = periph;
+	be_lun->flags = CTL_BE_PASSTHROUGH_LUN_UNCONFIGURED;
+	cbe_lun->flags =0 ;
+	
 	ctl_init_opts(&cbe_lun->options,
             lun_req->num_be_args, lun_req->kern_be_args);
         cbe_lun->scbus = params->scbus;
         cbe_lun->target = params->target;
         cbe_lun->lun = params->lun_num;
-	value = ctl_get_opt(&cbe_lun->options, "num_threads");
+        value = ctl_get_opt(&cbe_lun->options, "num_threads");
         if (value != NULL) {
                 tmp_num_threads = strtol(value, NULL, 0);
 
@@ -225,25 +224,25 @@ int ctl_backend_passthrough_create(struct cam_periph *periph,struct scsi_inquiry
                 }
                 num_threads = tmp_num_threads;
         }
-	cbe_lun->lun_shutdown =  ctl_backend_passthrough_lun_shutdown;
+        cbe_lun->lun_shutdown =  ctl_backend_passthrough_lun_shutdown;
         cbe_lun->lun_config_status = ctl_backend_passthrough_lun_config_status;
-	
-	be_lun->num_threads = num_threads;
+
+        be_lun->num_threads = num_threads;
+
+
 	be_lun->cbe_lun.maxlba=0;
-	be_lun->cbe_lun.blocksize=512;
+	cbe_lun->blocksize=512;
 	be_lun->size_bytes = 0;
 	be_lun->size_blocks =0;
-
-	be_lun->periph = periph;
-	be_lun->softc=softc;
+	cbe_lun->flags |=CTL_LUN_FLAG_UNMAP;
 	
-	be_lun->flags = CTL_BE_PASSTHROUGH_LUN_UNCONFIGURED;
+	
 	be_lun->cbe_lun.flags = CTL_LUN_FLAG_PRIMARY;
 	be_lun->cbe_lun.be_lun = be_lun;
 	be_lun->cbe_lun.req_lun_id=0;
 
-//	be_lun->cbe_lun.lun_shutdown = ctl_backend_passthrough_lun_shutdown;
-//	be_lun->cbe_lun.lun_config_status = ctl_backend_passthrough_lun_config_status;
+	be_lun->cbe_lun.lun_shutdown = ctl_backend_passthrough_lun_shutdown;
+	be_lun->cbe_lun.lun_config_status = ctl_backend_passthrough_lun_config_status;
 
 	be_lun->cbe_lun.be = &ctl_be_passthrough_driver;
 		snprintf(tmpstr, sizeof(tmpstr), "MYSERIAL%4d",
@@ -313,7 +312,7 @@ int ctl_backend_passthrough_create(struct cam_periph *periph,struct scsi_inquiry
 */
 bailout_error:
 //	free(be_lun , M_PASSTHROUGH);
-//	ctl_free_opts(&cbe_lun->options);
+
 	return (retval);
 
 }

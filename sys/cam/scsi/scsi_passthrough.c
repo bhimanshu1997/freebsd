@@ -109,11 +109,22 @@ typedef enum {
 
 struct ctlpass_io_req {
 	union ccb			 ccb;
-	union ccb			*alloced_ccb;
+	union ccb			 *alloced_ccb;
+	camq_entry			 user_periph_links;
+	ccb_ppriv_area			 user_periph_priv;
+	struct cam_periph_map_info	 mapinfo;
 	pass_io_flags			 flags;
 	ccb_flags			 data_flags;
+	bus_dma_segment_t		 user_segs[PASS_MAX_SEGS];
+	int				 num_kern_segs;
+	bus_dma_segment_t		 kern_segs[PASS_MAX_SEGS];
+	bus_dma_segment_t		*user_segptr;
+	bus_dma_segment_t		*kern_segptr;
 	int				 num_bufs;
+	uint32_t			 dirs[CAM_PERIPH_MAXMAPS];
 	uint32_t			 lengths[CAM_PERIPH_MAXMAPS];
+	uint8_t				*user_bufs[CAM_PERIPH_MAXMAPS];
+	uint8_t				*kern_bufs[CAM_PERIPH_MAXMAPS];
 	struct bintime			 start_time;
 	TAILQ_ENTRY(ctlpass_io_req)	 links;
 };
@@ -201,7 +212,7 @@ ctlpassinit(void)
 	}
 
 }
-/*
+
 static void
 ctlpassrejectios(struct cam_periph *periph)
 {
@@ -209,28 +220,28 @@ ctlpassrejectios(struct cam_periph *periph)
 	struct ctlpass_softc *softc;
 
 	softc = (struct ctlpass_softc *)periph->softc;
-*/
+
 	/*
 	 * The user can no longer get status for I/O on the done queue, so
 	 * clean up all outstanding I/O on the done queue.
 	 */
-/*	TAILQ_FOREACH_SAFE(io_req, &softc->done_queue, links, io_req2) {
+	TAILQ_FOREACH_SAFE(io_req, &softc->done_queue, links, io_req2) {
 		TAILQ_REMOVE(&softc->done_queue, io_req, links);
 		ctlpassiocleanup(softc, io_req);
 		uma_zfree(softc->pass_zone, io_req);
 	}
-*/
+
 	/*
 	 * The underlying device is gone, so we can't issue these I/Os.
 	 * The devfs node has been shut down, so we can't return status to
 	 * the user.  Free any I/O left on the incoming queue.
 	 */
-/*	TAILQ_FOREACH_SAFE(io_req, &softc->incoming_queue, links, io_req2) {
+	TAILQ_FOREACH_SAFE(io_req, &softc->incoming_queue, links, io_req2) {
 		TAILQ_REMOVE(&softc->incoming_queue, io_req, links);
 		ctlpassiocleanup(softc, io_req);
 		uma_zfree(softc->pass_zone, io_req);
 	}
-*/
+
 	/*
 	 * Normally we would put I/Os on the abandoned queue and acquire a
 	 * reference when we saw the final close.  But, the device went
@@ -240,22 +251,22 @@ ctlpassrejectios(struct cam_periph *periph)
 	 * them on the abandoned queue.  When the abandoned queue is empty,
 	 * we'll release the remaining reference (see below) to the peripheral.
 	 */
-/*	TAILQ_FOREACH_SAFE(io_req, &softc->active_queue, links, io_req2) {
+	TAILQ_FOREACH_SAFE(io_req, &softc->active_queue, links, io_req2) {
 		TAILQ_REMOVE(&softc->active_queue, io_req, links);
 		io_req->flags |= PASS_IO_ABANDONED;
 		TAILQ_INSERT_TAIL(&softc->abandoned_queue, io_req, links);
 	}
-*/
+
 	/*
 	 * If we put any I/O on the abandoned queue, acquire a reference.
 	 */
-/*	if ((!TAILQ_EMPTY(&softc->abandoned_queue))
+	if ((!TAILQ_EMPTY(&softc->abandoned_queue))
 	 && ((softc->flags & PASS_FLAG_ABANDONED_REF_SET) == 0)) {
 		cam_periph_doacquire(periph);
 		softc->flags |= PASS_FLAG_ABANDONED_REF_SET;
 	}
-}*/
-/*
+}
+
 static void
 ctlpassdevgonecb(void *arg)
 {
@@ -271,23 +282,23 @@ ctlpassdevgonecb(void *arg)
 	softc = (struct ctlpass_softc *)periph->softc;
 	KASSERT(softc->open_count >= 0, ("Negative open count %d",
 		softc->open_count));
-*/
+
 	/*
 	 * When we get this callback, we will get no more close calls from
 	 * devfs.  So if we have any dangling opens, we need to release the
 	 * reference held for that particular context.
 	 */
 	//for (i = 0; i < softc->open_count; i++)
-/*		cam_periph_release_locked(periph);
+		cam_periph_release_locked(periph);
 
 	softc->open_count = 0;
-*/
+
 	/*
 	 * Release the reference held for the device node, it is gone now.
 	 * Accordingly, inform all queued I/Os of their fate.
 	 */
-//	cam_periph_release_locked(periph);
-//	ctlpassrejectios(periph);
+	cam_periph_release_locked(periph);
+	ctlpassrejectios(periph);
 
 	/*
 	 * We reference the SIM lock directly here, instead of using
@@ -296,9 +307,9 @@ ctlpassdevgonecb(void *arg)
 	 * getting freed.  If that is the case, dereferencing the periph
 	 * with a cam_periph_unlock() call would cause a page fault.
 	 */
-//	mtx_unlock(mtx);
+	mtx_unlock(mtx);
 
-//}
+}
 
 static void
 ctlpassoninvalidate(struct cam_periph *periph)
@@ -318,7 +329,7 @@ ctlpassoninvalidate(struct cam_periph *periph)
 	 * Tell devfs this device has gone away, and ask for a callback
 	 * when it has cleaned up its state.
 	 */
-//	destroy_dev_sched_cb(softc->dev, ctlpassdevgonecb, periph);
+	destroy_dev_sched_cb(softc->dev, ctlpassdevgonecb, periph);
 }
 
 static void
@@ -517,7 +528,7 @@ ctlpassregister(struct cam_periph *periph, void *arg)
 	struct ccb_getdev *cgd;
 	struct ccb_pathinq cpi;
 	struct make_dev_args args;
-	int error, no_tags;
+	int error;// no_tags;
 	const char *str ="camsim";
 	const char *str1; 
 	struct cam_sim *sim;
@@ -571,23 +582,23 @@ ctlpassregister(struct cam_periph *periph, void *arg)
 	cpi.ccb_h.func_code = XPT_PATH_INQ;
 	xpt_action((union ccb *)&cpi);
 
-	if (cpi.maxio == 0)
-		softc->maxio = DFLTPHYS;	/* traditional default */
-	else if (cpi.maxio > MAXPHYS)
-		softc->maxio = MAXPHYS;		/* for safety */
-	else
-		softc->maxio = cpi.maxio;	/* real value */
-
+//	if (cpi.maxio == 0)
+//		softc->maxio = DFLTPHYS;	/* traditional default */
+//	else if (cpi.maxio > MAXPHYS)
+//		softc->maxio = MAXPHYS;		/* for safety */
+//	else
+//		softc->maxio = cpi.maxio;	/* real value */
+/*
 	if (cpi.hba_misc & PIM_UNMAPPED)
 		softc->flags |= PASS_FLAG_UNMAPPED_CAPABLE;
-
+*/
 	/*
 	 * We pass in 0 for a blocksize, since we don't 
 	 * know what the blocksize of this device is, if 
 	 * it even has a blocksize.
 	 */
 	cam_periph_unlock(periph);
-	no_tags = (cgd->inq_data.flags & SID_CmdQue) == 0;
+	/*no_tags = (cgd->inq_data.flags & SID_CmdQue) == 0;
 	softc->device_stats = devstat_new_entry("ctlpass",
 			  periph->unit_number, 0,
 			  DEVSTAT_NO_BLOCKSIZE
@@ -596,7 +607,9 @@ ctlpassregister(struct cam_periph *periph, void *arg)
 			  XPORT_DEVSTAT_TYPE(cpi.transport) |
 			  DEVSTAT_TYPE_PASS,
 			  DEVSTAT_PRIORITY_PASS);
-
+*/
+	if((cpi.ccb_h.status & CAM_DEV_QFRZN) != 0)
+		cam_release_devq(cpi.ccb_h.path, 0 ,0 ,0, 0);
 	/*
 	 * Acquire a reference to the periph that we can release once we've
 	 * cleaned up the kqueue.
@@ -821,13 +834,14 @@ static void
 ctlpassstart(struct cam_periph *periph, union ccb *start_ccb)
 {
 	struct ctlpass_softc *softc;
-	struct ctlpass_io_req *io_req;
 
 	softc = (struct ctlpass_softc *)periph->softc;
 	
 	switch (softc->state) {
 	case CTLPASS_STATE_NORMAL: {
-		
+		struct ctlpass_io_req *io_req;
+	
+		printf("\nctl passstart\n");	
 		/*
 		 * Check for any queued I/O requests that require an
 		 * allocated slot.
@@ -867,14 +881,16 @@ ctlpassstart(struct cam_periph *periph, union ccb *start_ccb)
 	}
 }
 
-static void ctlpassdone(struct cam_periph *periph, union ccb *done_ccb)
+static void
+ctlpassdone(struct cam_periph *periph, union ccb *done_ccb)
 { 
 	struct ctlpass_softc *softc;
 	struct ccb_scsiio *csio;
 	struct ctlpass_io_req *io_req;
 	union ctl_io *ctlio;
 	
-	
+
+	printf("ctlpassdone\n");	
 	softc = (struct ctlpass_softc *)periph->softc;
 
 	cam_periph_assert(periph, MA_OWNED);
@@ -882,7 +898,7 @@ static void ctlpassdone(struct cam_periph *periph, union ccb *done_ccb)
 	
 	csio = &done_ccb->csio;
 	
-		
+	
 	switch(csio->ccb_h.ccb_type){
 	case PASS_CCB_QUEUED_IO:{
 		io_req = done_ccb->ccb_h.ccb_ioreq;
@@ -912,12 +928,14 @@ static void ctlpassdone(struct cam_periph *periph, union ccb *done_ccb)
 				ctl_done((union ctl_io *)&ctlio->scsiio);
 
 		}
+	if((done_ccb->ccb_h.status & CAM_DEV_QFRZN) != 0)
+		cam_release_devq(done_ccb->ccb_h.path, 0 ,0 ,0, 0);
 
 		/*
 		 * Copy the allocated CCB contents back to the malloced CCB
 		 * so we can give status back to the user when he requests it.
 		 */
-		memcpy(&io_req->ccb,done_ccb,sizeof(*done_ccb));
+//	memcpy(&io_req->ccb,done_ccb,io->scsiio.cdb_len);
 
 		/*
 		 * Log data/transaction completion with devstat(9).
@@ -943,7 +961,8 @@ static void ctlpassdone(struct cam_periph *periph, union ccb *done_ccb)
 
 				//ctl_set_success(&ctlio->scsiio);
 				switch(csio->cdb_io.cdb_bytes[0])
-				{			
+				{
+		
 					case INQUIRY:
 					case SERVICE_ACTION_IN:
 					case READ_CAPACITY:
@@ -956,16 +975,23 @@ static void ctlpassdone(struct cam_periph *periph, union ccb *done_ccb)
 					case REQUEST_SENSE:
 					case REPORT_LUNS:{
 
-					printf("inquiry command");
+						if(csio->data_ptr == NULL)
+						{
+							printf("hello I am null");
+						}
 						memcpy(ctlio->scsiio.kern_data_ptr,csio->data_ptr,csio->dxfer_len);
+						//scsi_print_inquiry((struct scsi_inquiry_data *)ctlio->scsiio.kern_data_ptr);
 						ctlio->scsiio.kern_sg_entries = 0;
 						ctlio->scsiio.kern_data_resid = 0;
 						ctlio->scsiio.kern_rel_offset=0;
 						ctlio->scsiio.kern_data_len = csio->dxfer_len;
 						ctlio->scsiio.kern_total_len = csio->dxfer_len;
 						ctlio->scsiio.io_hdr.flags |= CTL_FLAG_ALLOCATED;
-																ctlio->scsiio.be_move_done = ctl_config_move_done;
-						ctl_datamove((union ctl_io *)ctlio);
+						ctlio->scsiio.be_move_done = ctl_config_move_done;
+	
+					//	free(csio->data_ptr, M_SCSIPASSTHROUGH);
+					//	csio->data_ptr= NULL;			
+					ctl_datamove((union ctl_io *)ctlio);
 						break;
 					}
 				
@@ -997,50 +1023,51 @@ static void ctlpassdone(struct cam_periph *periph, union ccb *done_ccb)
 		 * active queue and put it on the done queue.  Notitfy the
 		 * user that we have a completed I/O.
 		 */
-	//	if ((io_req->flags & PASS_IO_ABANDONED) == 0) {
+		if ((io_req->flags & PASS_IO_ABANDONED) == 0) {
 			TAILQ_REMOVE(&softc->active_queue, io_req, links);
-			TAILQ_INSERT_TAIL(&softc->done_queue, io_req, links);
-	
-	//	} else {
+			ctlpassiocleanup(softc, io_req);
+			uma_zfree(softc->pass_zone, io_req);
+		//	TAILQ_INSERT_TAIL(&softc->done_queue, io_req, links);	
+		} else {
 			/*
 			 * In the case of an abandoned I/O (final close
 			 * without fetching the I/O), take it off of the
 			 * abandoned queue and free it.
 			 */
-	/*		TAILQ_REMOVE(&softc->abandoned_queue, io_req, links);
+			TAILQ_REMOVE(&softc->abandoned_queue, io_req, links);
 			ctlpassiocleanup(softc, io_req);
 			uma_zfree(softc->pass_zone, io_req);
 	
-*/
+
 			/*
 			 * Release the done_ccb here, since we may wind up
 			 * freeing the peripheral when we decrement the
 			 * reference count below.
 			 */
-//			xpt_release_ccb(done_ccb);
+			xpt_release_ccb(done_ccb);
 
 			/*
 			 * If the abandoned queue is empty, we can release
 			 * our reference to the periph since we won't have
 			 * any more completions coming.
 			 */
-/*			if ((TAILQ_EMPTY(&softc->abandoned_queue))
+			if ((TAILQ_EMPTY(&softc->abandoned_queue))
 			 && (softc->flags & PASS_FLAG_ABANDONED_REF_SET)) {
 				softc->flags &= ~PASS_FLAG_ABANDONED_REF_SET;
 				cam_periph_release_locked(periph);
 			}
-*/
+
 			/*
 			 * We have already released the CCB, so we can
 			 * return.
 			 */
-	//		return;
-	//	}
+			return;
+		}
 		break;
 	}
 	}
 	
-xpt_release_ccb(done_ccb);
+	xpt_release_ccb(done_ccb);
 }
 
 static int
@@ -1076,14 +1103,13 @@ ctlpasscreatezone(struct cam_periph *periph)
 		    sizeof(struct ctlpass_io_req), NULL, NULL, NULL, NULL,
 		    /*align*/ 0, /*flags*/ 0);
 
-		softc->pass_io_zone = uma_zcreate(softc->io_zone_name,
-		    softc->io_zone_size, NULL, NULL, NULL, NULL,
-		    /*align*/ 0, /*flags*/ 0);
+//		softc->pass_io_zone = uma_zcreate(softc->io_zone_name,
+//		    softc->io_zone_size, NULL, NULL, NULL, NULL,
+//		    /*align*/ 0, /*flags*/ 0);
 
 		cam_periph_lock(periph);
 
-		if ((softc->pass_zone == NULL)
-		 || (softc->pass_io_zone == NULL)) {
+		if (softc->pass_zone == NULL) {
 			if (softc->pass_zone == NULL)
 				xpt_print(periph->path, "unable to allocate "
 				    "IO Req UMA zone\n");
@@ -1136,17 +1162,17 @@ static void
 ctlpassiocleanup(struct ctlpass_softc *softc, struct ctlpass_io_req *io_req)
 {
 	union ccb *ccb;
-	//u_int8_t **data_ptrs[CAM_PERIPH_MAXMAPS];
-	//int i, numbufs;
+	u_int8_t **data_ptrs[CAM_PERIPH_MAXMAPS];
+	int i, numbufs;
 
 	ccb = &io_req->ccb;
 
 	switch (ccb->ccb_h.func_code) {
 
 	case XPT_SCSI_IO:
-		free(io_req, M_SCSIPASSTHROUGH);
-//		data_ptrs[0] = &ccb->csio.data_ptr;
-//		numbufs = min(io_req->num_bufs, 1);
+	case XPT_CONT_TARGET_IO:
+		data_ptrs[0] = &ccb->csio.data_ptr;
+		numbufs = min(io_req->num_bufs, 1);
 		break;
 	default:
 		/* allow ourselves to be swapped once again */
@@ -1154,16 +1180,16 @@ ctlpassiocleanup(struct ctlpass_softc *softc, struct ctlpass_io_req *io_req)
 		break; /* NOTREACHED */ 
 	}
 
-//	if (io_req->flags & PASS_IO_USER_SEG_MALLOC) {
-//		free(io_req->user_segptr, M_SCSIPASSTHROUGH);
-//		io_req->user_segptr = NULL;
-//	}
+	if (io_req->flags & PASS_IO_USER_SEG_MALLOC) {
+		free(io_req->user_segptr, M_SCSIPASSTHROUGH);
+		io_req->user_segptr = NULL;
+	}
 
 	/*
 	 * We only want to free memory we MALLOC_DECLARE(M_CTLPASS);
 MALLOC_DEFINE(M_CTLPASS, "CTL PASS BUFFER","BUFFER FOR CTLPASS DRIVER");malloced.
 	 */
-/*	if (io_req->data_flags == CAM_DATA_VADDR) {
+	if (io_req->data_flags == CAM_DATA_VADDR) {
 		for (i = 0; i < io_req->num_bufs; i++) {
 			if (io_req->kern_bufs[i] == NULL)
 				continue;
@@ -1189,16 +1215,16 @@ MALLOC_DEFINE(M_CTLPASS, "CTL PASS BUFFER","BUFFER FOR CTLPASS DRIVER");malloced
 	}
 
 	if (io_req->data_flags != CAM_DATA_PADDR) {
-		for (i = 0; i < numbufs; i++) {*/
+		for (i = 0; i < numbufs; i++) {
 			/*
 			 * Restore the user's buffer pointers to their
 			 * previous values.
 			 */
-/*			if (io_req->user_bufs[i] != NULL)
+			if (io_req->user_bufs[i] != NULL)
 				*data_ptrs[i] = io_req->user_bufs[i];
 		}
 	}
-*/
+
 }
 
 
@@ -1207,6 +1233,7 @@ static int ctlccb(struct cam_periph *periph,union ctl_io *io)
 {
 	struct	ctlpass_softc *softc;
 	union ccb *ccb;
+	
 	int	error;
 	uint32_t priority;
 	struct ctlpass_io_req *io_req;
@@ -1216,6 +1243,7 @@ static int ctlccb(struct cam_periph *periph,union ctl_io *io)
 	softc = (struct ctlpass_softc *)periph->softc;
 
 
+	printf("I am in ctlccb");
 		
 	error =0;
 	
@@ -1241,26 +1269,72 @@ static int ctlccb(struct cam_periph *periph,union ctl_io *io)
 		{
 		
 			case INQUIRY:{
+					struct scsi_inquiry *cdb;
+
+					cdb = (struct scsi_inquiry *)io->scsiio.cdb;
+
+					if(cdb->byte2 & SI_EVPD)
+					{
+						switch(cdb->page_code){
+						case SVPD_SUPPORTED_PAGES:
+						//	int sup_page_size;
+						//	struct scsi_vpd_supported_pages *pages;
+							
+							//sup_page_size = sizeof(struct scsi_vpd_supported_pages)*10;
+							printf("ctlpass suported pages");
+							io->scsiio.kern_data_ptr = malloc(sizeof(struct scsi_vpd_supported_pages)*10/*SCSI_EVPD_NUM_SUPPORTED_PAGES*/ ,M_CTL, M_WAITOK); 
+							io->scsiio.kern_data_len=sizeof(struct scsi_vpd_supported_pages)*10/*SCSI_EVPD_NUM_SUPPORTED_PAGES*/;
+							csio->data_ptr =malloc(sizeof(struct scsi_vpd_supported_pages)*10/*SCSI_EVPD_NUM_SUPPORTED_PAGES*/,M_SCSIPASSTHROUGH, M_WAITOK);
+							csio->dxfer_len =sizeof(struct scsi_vpd_supported_pages)*10/*SCSI_EVPD_NUM_SUPPORTED_PAGES*/;
+
+							break;
+						case SVPD_UNIT_SERIAL_NUMBER:
+							printf("ctlpass svpd unit serial number");
+							io->scsiio.kern_data_ptr = malloc(sizeof(struct scsi_vpd_unit_serial_number),M_CTL, M_WAITOK); 
+							io->scsiio.kern_data_len= sizeof(struct scsi_vpd_unit_serial_number);
+							csio->data_ptr =malloc(sizeof(struct scsi_vpd_unit_serial_number),M_SCSIPASSTHROUGH, M_WAITOK);
+							csio->dxfer_len = sizeof(struct scsi_vpd_unit_serial_number);
+							 break;
+						case SVPD_DEVICE_ID:
+							printf("ctlpass svpd device id");
+							io->scsiio.kern_data_ptr = malloc(SVPD_DEVICE_ID_MAX_SIZE,M_CTL, M_WAITOK); 
+							io->scsiio.kern_data_len= SVPD_DEVICE_ID_MAX_SIZE;
+							csio->data_ptr =malloc(SVPD_DEVICE_ID_MAX_SIZE,M_SCSIPASSTHROUGH, M_WAITOK);
+							csio->dxfer_len = SVPD_DEVICE_ID_MAX_SIZE;
+							break;
+						case SVPD_EXTENDED_INQUIRY_DATA:
+							printf("ctl pass inquiry data");
+							io->scsiio.kern_data_ptr = malloc(sizeof(struct scsi_vpd_extended_inquiry_data),M_CTL, M_WAITOK); 
+							io->scsiio.kern_data_len= sizeof(struct scsi_vpd_extended_inquiry_data);
+							csio->data_ptr =malloc(sizeof(struct scsi_vpd_extended_inquiry_data),M_SCSIPASSTHROUGH, M_WAITOK);
+							csio->dxfer_len = sizeof(struct scsi_vpd_extended_inquiry_data);
+							break;
+				}
+			}
+			else
+			{
 					struct scsi_inquiry *scsi_cmd;
+					printf("hello inquiry");
 					scsi_cmd = (struct scsi_inquiry *)&csio->cdb_io.cdb_bytes;
 					bzero(scsi_cmd, sizeof(*scsi_cmd));
-				
 	
-					io->scsiio.kern_data_ptr =malloc(sizeof(struct scsi_inquiry_data),M_CTL, M_WAITOK);
+					io->scsiio.kern_data_ptr =malloc(io->scsiio.ext_data_len,M_CTL, M_WAITOK);
 	 	
-					io->scsiio.kern_data_len = sizeof(struct scsi_inquiry_data);
-					csio->cdb_len = sizeof(*scsi_cmd);
-					csio->ccb_h.flags = CAM_DIR_IN;
-					csio->sense_len = SSD_FULL_SIZE;
+					io->scsiio.kern_data_len = io->scsiio.ext_data_len;
+					csio->data_ptr =malloc(io->scsiio.kern_data_len,M_SCSIPASSTHROUGH, M_WAITOK);
+					csio->dxfer_len = io->scsiio.kern_data_len;
+			}
+			printf("after switch case");
+			csio->cdb_len = io->scsiio.cdb_len;
+			csio->ccb_h.flags = CAM_DIR_IN;
+			csio->sense_len = SSD_FULL_SIZE;
 
-					csio->data_ptr =malloc(sizeof(struct scsi_inquiry_data),M_SCSIPASSTHROUGH, M_WAITOK);
-					csio->dxfer_len = sizeof(struct scsi_inquiry_data);
-					break;
-					}
+			break;
+		}
 			case REQUEST_SENSE:{
 					struct scsi_request_sense *scsi_cmd;
 					scsi_cmd = (struct scsi_request_sense *)&csio->cdb_io.cdb_bytes;
-					bzero(scsi_cmd, sizeof(*scsi_cmd));
+			//		bzero(scsi_cmd, sizeof(*scsi_cmd));
 
 
 					io->scsiio.kern_data_ptr =malloc(sizeof(struct scsi_sense_data),M_CTL, M_WAITOK);
@@ -1308,7 +1382,7 @@ static int ctlccb(struct cam_periph *periph,union ctl_io *io)
 				struct scsi_start_stop_unit *scsi_cmd;
 				int extra_flags=0;
 				scsi_cmd = (struct scsi_start_stop_unit *)&csio->cdb_io.cdb_bytes;
-				bzero(scsi_cmd , sizeof(*scsi_cmd));
+			//	bzero(scsi_cmd , sizeof(*scsi_cmd));
 
 				csio->cdb_len = sizeof(*scsi_cmd);	
 				
@@ -1324,7 +1398,7 @@ static int ctlccb(struct cam_periph *periph,union ctl_io *io)
 			case READ_CAPACITY:{
 					struct scsi_read_capacity *scsi_cmd;
 					scsi_cmd = (struct scsi_read_capacity *)&csio->cdb_io.cdb_bytes;
-				bzero(scsi_cmd, sizeof(*scsi_cmd));
+			//	bzero(scsi_cmd, sizeof(*scsi_cmd));
 			io->scsiio.kern_data_ptr =(uint8_t *)malloc(sizeof(struct scsi_read_capacity_data_long),M_CTL, M_WAITOK);
 	 	
 			io->scsiio.kern_data_len = sizeof(struct scsi_read_capacity_data_long);
@@ -1343,7 +1417,7 @@ static int ctlccb(struct cam_periph *periph,union ctl_io *io)
 			case SERVICE_ACTION_IN:{
 				struct scsi_read_capacity_16 *scsi_cmd;
 				scsi_cmd = (struct scsi_read_capacity_16 *)&csio->cdb_io.cdb_bytes;
-			bzero(scsi_cmd, sizeof(*scsi_cmd));
+		//	bzero(scsi_cmd, sizeof(*scsi_cmd));
 				io->scsiio.kern_data_ptr =(uint8_t *)malloc(sizeof(struct scsi_read_capacity_data_long),M_CTL, M_WAITOK);
 	 	
 			io->scsiio.kern_data_len = sizeof(struct scsi_read_capacity_data_long);
@@ -1374,15 +1448,16 @@ static int ctlccb(struct cam_periph *periph,union ctl_io *io)
 			csio->sense_len = SSD_FULL_SIZE;
 		
 			csio->dxfer_len = sizeof(struct scsi_mode_header_6)+sizeof(struct scsi_mode_blk_desc);		
-			csio->data_ptr =malloc(csio->dxfer_len,M_CTLPASS, M_WAITOK);*/
-			error=1;
-			return (error);
-			break;
+			csio->data_ptr =malloc(csio->dxfer_len,M_CTLPASS, M_WAITOK);
+	*/
+					error=1;
+					return (error);
+					break;
 			}
 			case MODE_SENSE_10:{
 				struct scsi_mode_sense_10 *scsi_cmd;
 				scsi_cmd = (struct scsi_mode_sense_10 *)&csio->cdb_io.cdb_bytes;
-				bzero(scsi_cmd, sizeof(*scsi_cmd));
+		//		bzero(scsi_cmd, sizeof(*scsi_cmd));
 				io->scsiio.kern_data_len = sizeof(struct scsi_mode_header_10)+sizeof(struct scsi_mode_blk_desc);
 				io->scsiio.kern_data_ptr =malloc(io->scsiio.kern_data_len,M_CTL, M_WAITOK);
 	 		
@@ -1402,7 +1477,7 @@ static int ctlccb(struct cam_periph *periph,union ctl_io *io)
 			case TEST_UNIT_READY:{
 					struct scsi_test_unit_ready *scsi_cmd;
 					scsi_cmd = (struct scsi_test_unit_ready *)&csio->cdb_io.cdb_bytes;
-					bzero(scsi_cmd , sizeof(*scsi_cmd));
+		//			bzero(scsi_cmd , sizeof(*scsi_cmd));
 
 				csio->cdb_len = sizeof(*scsi_cmd);	
 	
@@ -1419,7 +1494,7 @@ static int ctlccb(struct cam_periph *periph,union ctl_io *io)
 				scsi_cmd = (struct scsi_rw_6 *)&csio->cdb_io.cdb_bytes;
 				csio->cdb_len = sizeof(*scsi_cmd);
 				io->scsiio.kern_rel_offset =0 ;
-				bzero(scsi_cmd, sizeof(*scsi_cmd));
+		//		bzero(scsi_cmd, sizeof(*scsi_cmd));
 			//	printf("%.*s",io->scsiio.kern_data_len,io->scsiio.kern_data_ptr);
 
 				csio->ccb_h.flags = CAM_DIR_OUT;
@@ -1434,7 +1509,7 @@ static int ctlccb(struct cam_periph *periph,union ctl_io *io)
 			case WRITE_10:{
 					struct scsi_rw_10 *scsi_cmd;
 				scsi_cmd = (struct scsi_rw_10 *)&csio->cdb_io.cdb_bytes;
-					bzero(scsi_cmd, sizeof(*scsi_cmd));
+		//			bzero(scsi_cmd, sizeof(*scsi_cmd));
 				csio->cdb_len = sizeof(*scsi_cmd);
 				io->scsiio.kern_rel_offset =0 ;
 
@@ -1607,7 +1682,8 @@ static int ctlccb(struct cam_periph *periph,union ctl_io *io)
 					return 1;
 					break;
 		}
-	memcpy(csio->cdb_io.cdb_bytes,io->scsiio.cdb,IOCDBLEN);
+	
+	memcpy(csio->cdb_io.cdb_bytes,io->scsiio.cdb, io->scsiio.cdb_len);
 		
 		ccb->ccb_h.func_code = XPT_SCSI_IO;
 
@@ -1643,14 +1719,14 @@ static int ctlccb(struct cam_periph *periph,union ctl_io *io)
 
 		ccb->ccb_h.cbfcnp = ctlpassdone;
 		
-		xpt_setup_ccb(&ccb->ccb_h, periph->path,CAM_PRIORITY_NORMAL);		
+		xpt_setup_ccb(&ccb->ccb_h, periph->path,priority);		
 
 	
 		
 	
 		
 	
-		//io_req->mapinfo.num_bufs_used = 0;
+		io_req->mapinfo.num_bufs_used = 0;
 
         	cam_periph_lock(periph);	
 
@@ -1659,7 +1735,7 @@ static int ctlccb(struct cam_periph *periph,union ctl_io *io)
 		 */
 		TAILQ_INSERT_TAIL(&softc->incoming_queue, io_req, links);
 	
-		xpt_schedule(periph,CAM_PRIORITY_NORMAL);
+		xpt_schedule(periph,priority);
 		
 bailout:
 	cam_periph_unlock(periph);
