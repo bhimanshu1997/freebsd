@@ -974,8 +974,6 @@ lun_passthrough_device:	 PASSTHROUGH_DEVICE STR
                   if(tmp!=NULL && *tmp != '\0')
                     lun_set_pass_periph(lun, tmp); 
                     
-                printf("%s",lun->l_pass_periph);
-	
 	}
 	;	
 
@@ -996,7 +994,6 @@ lun_passthrough_address:  PASSTHROUGH_ADDRESS STR
 		    tmp = strtok(NULL,":");
 		    if(tmp!=NULL && *tmp != '\0')
 		      lun->l_pass_lun = strtol(tmp,NULL,0);
-		printf("%d   %d   %d",lun->l_pass_bus, lun->l_pass_target, lun->l_pass_lun);
 	}
 	;
 

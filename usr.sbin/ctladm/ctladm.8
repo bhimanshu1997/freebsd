@@ -691,7 +691,9 @@ This specifies the name backend to use when creating the LUN.
 Examples are
 .Dq ramdisk
 and
-.Dq block .
+.Dq block 
+and
+.Dq passthrough .
 .It Fl B Ar blocksize
 Specify the blocksize of the backend in bytes.
 .It Fl d Ar device_id
@@ -736,7 +738,9 @@ Specify the backend that owns the LUN to be removed.
 Examples are
 .Dq ramdisk
 and
-.Dq block .
+.Dq block
+and 
+.Dq passthrough .
 .It Fl l Ar lun_id
 Specify the LUN number to remove.
 .It Fl o Ar name=value
@@ -755,7 +759,9 @@ Specify the backend that owns the LUN to be removed.
 Examples are
 .Dq ramdisk
 and
-.Dq block .
+.Dq block
+and 
+.Dq passthrough .
 .It Fl l Ar lun_id
 Specify the LUN number to remove.
 .It Fl o Ar name=value
@@ -783,7 +789,9 @@ This restricts the LUN list to the named backend.
 Examples are
 .Dq ramdisk
 and
-.Dq block .
+.Dq block
+and 
+.Dq passthrough .
 .It Fl v
 Be verbose.
 This will also display any backend-specific LUN attributes in addition to
@@ -971,6 +979,12 @@ as the backing store.
 The size of the LUN will be derived from the size of the file.
 .Pp
 .Dl ctladm create -b block -o file=src/usr.sbin/ctladm/ctladm.8 -S MYSERIAL321 -d MYDEVID123
+.Pp
+Creating a LUN using the passthrough backend, specify the passthrough address
+.Pa 2:0:0 (bus:target:lun) 
+as the passthrough device
+.Pp
+.Dl ctladm create -b passthrough -o passthrough=2:0:0
 .Pp
 Create a LUN using the block backend, specify the file
 .Pa src/usr.sbin/ctladm/ctladm.8

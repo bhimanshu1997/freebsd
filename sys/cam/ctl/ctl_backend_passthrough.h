@@ -49,7 +49,7 @@ struct ctl_be_passthrough_lun {
 	struct ctl_be_lun cbe_lun;
 	STAILQ_HEAD(, ctl_io_hdr) cont_queue;
 	struct mtx_padalign queue_lock;
-	int num_threads;
+    	int num_threads;
 };
 
 

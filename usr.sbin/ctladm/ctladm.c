@@ -2451,7 +2451,6 @@ cctl_create_lun(int fd, int argc, char **argv, char *combinedopt)
 		                      lun = strtol(tmp,NULL,0);
 				  }
 				}
-                		warn("%d   %d   %d",scbus, target,lun);
 		
 				req.reqdata.create.scbus = scbus;
 		                req.reqdata.create.target = target;

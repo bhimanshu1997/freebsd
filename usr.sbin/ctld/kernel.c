@@ -706,7 +706,6 @@ kernel_lun_add(struct lun *lun)
 		req.reqdata.create.target = lun->l_pass_target;
 		req.reqdata.create.lun_num = lun->l_pass_lun;
 	}
-	log_warnx("if in");
 	if(lun->l_is_passthrough && lun->l_pass_periph != NULL)
 	{
 
@@ -734,7 +733,6 @@ kernel_lun_add(struct lun *lun)
         	ccb.cdm.num_matches = 0;
 		ccb.cdm.num_patterns = 0;
 	        ccb.cdm.pattern_buf_len = 0;
-		log_warnx("before do");
         	do {
 			if (ioctl(fd, CAMIOCOMMAND, &ccb) == -1) {
                         	log_warn("error sending CAMIOCOMMAND ioctl");
@@ -753,13 +751,11 @@ kernel_lun_add(struct lun *lun)
   	                        periph_result = &ccb.cdm.matches[i].result.periph_result;
 				if (strcmp(periph_result->periph_name, "pass") == 0)
                                	        continue;
-				log_warnx("in for");
 				sprintf(peripheral,"%s%d",periph_result->periph_name,(int)periph_result->unit_number);
 				if(strcmp(peripheral, lun->l_pass_periph) == 0) {
 					req.reqdata.create.scbus = periph_result->path_id;
 			                req.reqdata.create.target = periph_result->target_id;
 			                req.reqdata.create.lun_num = periph_result->target_lun;
-					log_warnx("pass created: %d %d %d",req.reqdata.create.scbus,req.reqdata.create.target,req.reqdata.create.lun_num);		
 				}
 	      	        }
         	     } while ((ccb.ccb_h.status == CAM_REQ_CMP)
@@ -768,7 +764,6 @@ kernel_lun_add(struct lun *lun)
 	  close(fd);
 	
 	}
-	log_warnx("if out");
 	if (!lun->l_is_passthrough && lun->l_size != 0)
 		req.reqdata.create.lun_size_bytes = lun->l_size;
 
@@ -812,7 +807,6 @@ kernel_lun_add(struct lun *lun)
 			assert(o != NULL);
 		}
 	}
- 	log_warnx("option new   %s  %s",o->o_name, o->o_value);	
 	o = option_find(&lun->l_options, "ctld_name");
 	if (o != NULL) {
 		option_set(o, lun->l_name);
@@ -820,17 +814,14 @@ kernel_lun_add(struct lun *lun)
 		o = option_new(&lun->l_options, "ctld_name", lun->l_name);
 		assert(o != NULL);
 	}
-	log_warnx("option new   %s  %s",o->o_name, o->o_value);
 	o = option_find(&lun->l_options, "scsiname");
 	if (o == NULL && lun->l_scsiname != NULL) {
 		o = option_new(&lun->l_options, "scsiname", lun->l_scsiname);
 		assert(o != NULL);
 	}
-	log_warnx("option new   %s  %s",o->o_name, o->o_value);
 	num_options = 0;
 	TAILQ_FOREACH(o, &lun->l_options, o_next)
 		num_options++;
-	log_warnx("num option %d",num_options);
 	req.num_be_args = num_options;
 	if (num_options > 0) {
 		req.be_args = malloc(num_options * sizeof(*req.be_args));
@@ -851,7 +842,6 @@ kernel_lun_add(struct lun *lun)
 	error = ioctl(ctl_fd, CTL_LUN_REQ, &req);
 	free(req.be_args);
 	if (error != 0) {
-		log_warn("in kernel lun add");
 		log_warn("error issuing CTL_LUN_REQ ioctl");
 		return (1);
 	}
